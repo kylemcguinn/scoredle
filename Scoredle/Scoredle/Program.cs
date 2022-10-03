@@ -8,6 +8,7 @@ using Discord.Commands;
 using Discord.WebSocket;
 using Discord.Net;
 using Newtonsoft.Json;
+using Microsoft.Extensions.Configuration;
 
 namespace Scoredle
 {
@@ -27,6 +28,7 @@ namespace Scoredle
         // These two types require you install the Discord.Net.Commands package.
         private readonly CommandService _commands;
         private readonly IServiceProvider _services;
+        private readonly IConfiguration _config;
 
         private Program()
         {
@@ -56,9 +58,14 @@ namespace Scoredle
                 CaseSensitiveCommands = false,
             });
 
+            _config = new ConfigurationBuilder()
+                .SetBasePath(AppDomain.CurrentDomain.BaseDirectory)
+                .AddJsonFile("appsettings.json")
+                .AddUserSecrets<Program>()
+                .Build();
+
             _client.Log += Log;
             _client.Ready += Client_Ready;
-            _client.SlashCommandExecuted += SlashCommandHandler;
 
             _commands.Log += Log;
 
@@ -73,9 +80,9 @@ namespace Scoredle
         private static IServiceProvider ConfigureServices()
         {
             var map = new ServiceCollection();
-                // Repeat this for all the service classes
-                // and other dependencies that your commands might need.
-                //.AddSingleton(new SomeServiceClass());
+            // Repeat this for all the service classes
+            // and other dependencies that your commands might need.
+            //.AddSingleton(new SomeServiceClass());
 
             // When all your required services are in the collection, build the container.
             // Tip: There's an overload taking in a 'validateScopes' bool to make sure
@@ -118,14 +125,14 @@ namespace Scoredle
 
         private async Task MainAsync()
         {
+            //var token = Environment.GetEnvironmentVariable("DiscordBotToken");
+            var token = _config["DiscordBotToken"];
+
             // Centralize the logic for commands into a separate method.
             await InitCommands();
 
             // Login and connect.
-            await _client.LoginAsync(TokenType.Bot,
-                // < DO NOT HARDCODE YOUR TOKEN >
-                /*Environment.GetEnvironmentVariable("DiscordToken")*/
-                "MTAyNjI5MjU5Njc4OTc0Nzc5Mw.GROZZW.KKNKSoEUiRpblhkXx0JRFNy1ZJpqgGFTw2XpeY");
+            await _client.LoginAsync(TokenType.Bot, token);
             await _client.StartAsync();
 
             // Wait infinitely so your bot actually stays connected.
@@ -145,6 +152,7 @@ namespace Scoredle
 
             // Subscribe a handler to see if a message invokes a command.
             _client.MessageReceived += HandleCommandAsync;
+            _client.SlashCommandExecuted += SlashCommandHandler;
         }
 
         private async Task HandleCommandAsync(SocketMessage arg)
