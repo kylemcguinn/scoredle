@@ -125,7 +125,6 @@ namespace Scoredle
 
         private async Task MainAsync()
         {
-            //var token = Environment.GetEnvironmentVariable("DiscordBotToken");
             var token = _config["DiscordBotToken"];
 
             // Centralize the logic for commands into a separate method.
