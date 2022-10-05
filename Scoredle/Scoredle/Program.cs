@@ -9,6 +9,9 @@ using Discord.WebSocket;
 using Discord.Net;
 using Newtonsoft.Json;
 using Microsoft.Extensions.Configuration;
+using Scoredle.Data;
+using Microsoft.EntityFrameworkCore;
+using Scoredle.Services;
 
 namespace Scoredle
 {
@@ -40,7 +43,8 @@ namespace Scoredle
                 // If you or another service needs to do anything with messages
                 // (eg. checking Reactions, checking the content of edited/deleted messages),
                 // you must set the MessageCacheSize. You may adjust the number as needed.
-                //MessageCacheSize = 50,
+                MessageCacheSize = 50,
+                GatewayIntents = GatewayIntents.MessageContent | GatewayIntents.GuildMessages | GatewayIntents.Guilds,
 
                 // If your platform doesn't have native WebSockets,
                 // add Discord.Net.Providers.WS4Net from NuGet,
@@ -77,12 +81,15 @@ namespace Scoredle
         // If any services require the client, or the CommandService, or something else you keep on hand,
         // pass them as parameters into this method as needed.
         // If this method is getting pretty long, you can seperate it out into another file using partials.
-        private static IServiceProvider ConfigureServices()
+        private IServiceProvider ConfigureServices()
         {
-            var map = new ServiceCollection();
+            var map = new ServiceCollection()
             // Repeat this for all the service classes
             // and other dependencies that your commands might need.
-            //.AddSingleton(new SomeServiceClass());
+            .AddSingleton<IGameService, GameService>();
+
+            map.AddDbContext<ScordleContext>(
+                o => o.UseSqlServer(_config.GetConnectionString("ScordleDb")));
 
             // When all your required services are in the collection, build the container.
             // Tip: There's an overload taking in a 'validateScopes' bool to make sure
@@ -185,6 +192,18 @@ namespace Scoredle
                 //if (!result.IsSuccess && result.Error != CommandError.UnknownCommand)
                 //    await msg.Channel.SendMessageAsync(result.ErrorReason);
             }
+
+            var gameService = _services.GetService<IGameService>();
+            if (gameService == null)
+                throw new Exception("Unable to resolve IGameService");
+
+            var game = await gameService.GetGameFromMessage(msg.Content);
+
+            if (game != null)
+            {
+                Console.WriteLine(game.Name);
+            }
+
         }
         private async Task Client_Ready()
         {

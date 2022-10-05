@@ -3,7 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.3.32811.315
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Scoredle", "Scoredle\Scoredle.csproj", "{9777BF3F-5C07-409B-AD27-49C1A69CFA57}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Scoredle", "Scoredle\Scoredle.csproj", "{9777BF3F-5C07-409B-AD27-49C1A69CFA57}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Scoredle.Data", "Scoredle.Data\Scoredle.Data.csproj", "{42EDCE9A-D3FC-4280-98D3-11212410CDCA}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,6 +17,10 @@ Global
 		{9777BF3F-5C07-409B-AD27-49C1A69CFA57}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{9777BF3F-5C07-409B-AD27-49C1A69CFA57}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{9777BF3F-5C07-409B-AD27-49C1A69CFA57}.Release|Any CPU.Build.0 = Release|Any CPU
+		{42EDCE9A-D3FC-4280-98D3-11212410CDCA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{42EDCE9A-D3FC-4280-98D3-11212410CDCA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{42EDCE9A-D3FC-4280-98D3-11212410CDCA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{42EDCE9A-D3FC-4280-98D3-11212410CDCA}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
