@@ -201,7 +201,11 @@ namespace Scoredle
 
             if (game != null)
             {
-                Console.WriteLine(game.Name);
+                var guildUser = msg.Author as SocketGuildUser;
+
+                var displayName = guildUser != null ? guildUser.DisplayName : msg.Author.Username;
+
+                await gameService.SubmitScore(msg.Id, msg.Content, game, msg.Author.Id, displayName, msg.Timestamp);
             }
 
         }
