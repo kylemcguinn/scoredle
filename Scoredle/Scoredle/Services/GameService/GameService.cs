@@ -1,15 +1,14 @@
-﻿using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.FileSystemGlobbing;
+﻿using Discord;
+using Discord.Net;
+using Discord.WebSocket;
+using Microsoft.EntityFrameworkCore;
 using Scoredle.Data;
 using Scoredle.Data.Entities;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+using System.Security.Cryptography.X509Certificates;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
+using Game = Scoredle.Data.Entities.Game;
 
-namespace Scoredle.Services
+namespace Scoredle.Services.GameService
 {
     public class GameService : IGameService
     {
@@ -29,6 +28,13 @@ namespace Scoredle.Services
         public async Task<Game?> GetGameFromMessage(string message)
         {
             var games = await GetGames();
+            var game = getGame(message, games);
+
+            return game;
+        }
+
+        private Game? getGame(string message, List<Game> games)
+        {
             Game? matchedGame = null;
 
             foreach (Game game in games)
@@ -45,38 +51,40 @@ namespace Scoredle.Services
             return matchedGame;
         }
 
-        public async Task SubmitScore(ulong messageId, string message, Game game, ulong userId, string userDisplayName, DateTimeOffset submissionDateTime)
+        private Score? getScore(Game game, IMessage message)
         {
-            var existingMessage = _scordleContext.Scores.Where(x => x.MessageId == messageId);
+            var messageId = message.Id;
+            var messageContent = message.Content;
+            var userId = message.Author.Id;
+            string userDisplayName = (message.Author as SocketGuildUser)?.DisplayName ?? message.Author.Username;
+            var submissionDateTime = message.Timestamp;
+            var channelId = message.Channel.Id;
+            var guildId = (message.Channel as SocketGuildChannel)?.Guild?.Id;
+
+
+            var existingMessage = _scordleContext.Scores.Where(x => x.MessageId == message.Id);
 
             if (existingMessage.ToList().Count > 0)
             {
                 Console.WriteLine("Score entry already exists for this message. Skipping score insert!");
-                return;
+                return null;
             }
 
-            var match = Regex.Match(message, game.Pattern);
+            var match = Regex.Match(message.Content, game.Pattern);
 
             var attempts = match.Groups["attempts"];
             if (attempts == null)
                 throw new Exception("Unable to parse 'attempts' from submission");
-            
+
             var maxAttempts = match.Groups["maxAttempts"];
             if (maxAttempts == null)
                 throw new Exception("Unable to parse 'maxAttempts' from submission");
 
             var hardMode = match.Groups["hard"];
-            var gameNumberString = match.Groups["gameNumber"];
-            int? gameNumber = null;
-
+            var gameId = match.Groups["gameId"];
 
             int attemptsValue = int.Parse(attempts.Value);
             int maxAttemptsValue = int.Parse(maxAttempts.Value);
-
-            if (!string.IsNullOrEmpty(gameNumberString.Value))
-            {
-                gameNumber = int.Parse(gameNumberString.Value);
-            }
 
             var score = new Score
             {
@@ -90,11 +98,48 @@ namespace Scoredle.Services
                 ScoreValue = calculateScore(attemptsValue, maxAttemptsValue),
                 Attempts = attemptsValue,
                 Note = string.IsNullOrEmpty(hardMode.Value) ? null : "hard",
-                GameNumber = gameNumber
+                GameIdentifier = string.IsNullOrEmpty(gameId.Value) ? null : gameId.Value,
+                ChannelId = channelId,
+                GuildId = guildId
             };
 
+            return score;
+        }
+
+        public async Task SubmitScore(Game game, IMessage message)
+        {
+            var score = getScore(game, message);
+
+            if (score == null)
+                return;
+
             _scordleContext.Scores.Add(score);
+
             await _scordleContext.SaveChangesAsync();
+        }
+
+        public async Task<int> LoadHistoricalMessages(IAsyncEnumerable<IReadOnlyCollection<IMessage>> pagedMessages)
+        {
+            var games = await GetGames();
+
+            await foreach (var messages in pagedMessages)
+            {
+                foreach (var message in messages)
+                {
+                    var game = getGame(message.Content, games);
+                    
+                    if (game != null)
+                    {
+                        var score = getScore(game, message);
+
+                        if (score != null)
+                            _scordleContext.Scores.Add(score);
+                    }
+                }
+            }
+
+            var insertedRows = await _scordleContext.SaveChangesAsync();
+            return insertedRows;
         }
 
         private int calculateScore(int attempts, int maxAttempts)

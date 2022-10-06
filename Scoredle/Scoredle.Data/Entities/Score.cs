@@ -18,6 +18,8 @@ namespace Scoredle.Data.Entities
         public DateTimeOffset SubmissionDateTime { get; set; }
         public string SubmissionText { get; set; } = string.Empty;
         public string? Note { get; set; }
-        public int? GameNumber { get; set; }
+        public string? GameIdentifier { get; set; }
+        public ulong ChannelId { get; set; }
+        public ulong? GuildId { get; set; }
     }
 }

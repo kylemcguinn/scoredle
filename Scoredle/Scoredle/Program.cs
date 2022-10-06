@@ -11,7 +11,7 @@ using Newtonsoft.Json;
 using Microsoft.Extensions.Configuration;
 using Scoredle.Data;
 using Microsoft.EntityFrameworkCore;
-using Scoredle.Services;
+using Scoredle.Services.GameService;
 
 namespace Scoredle
 {
@@ -193,27 +193,31 @@ namespace Scoredle
                 //    await msg.Channel.SendMessageAsync(result.ErrorReason);
             }
 
-            var gameService = _services.GetService<IGameService>();
-            if (gameService == null)
-                throw new Exception("Unable to resolve IGameService");
+            var gameService = getGameService();
 
             var game = await gameService.GetGameFromMessage(msg.Content);
 
             if (game != null)
             {
-                var guildUser = msg.Author as SocketGuildUser;
-
-                var displayName = guildUser != null ? guildUser.DisplayName : msg.Author.Username;
-
-                await gameService.SubmitScore(msg.Id, msg.Content, game, msg.Author.Id, displayName, msg.Timestamp);
+                await gameService.SubmitScore(game, msg);
             }
 
+        }
+
+        private IGameService getGameService()
+        {
+            var gameService = _services.GetService<IGameService>();
+            if (gameService == null)
+                throw new Exception("Unable to resolve IGameService");
+
+            return gameService;
         }
         private async Task Client_Ready()
         {
             var globalCommand = new SlashCommandBuilder();
             globalCommand.WithName("load-history");
             globalCommand.WithDescription("Load historical score messages");
+            globalCommand.AddOption(new SlashCommandOptionBuilder { Type = ApplicationCommandOptionType.Integer, Name = "message-count", Description = "Amount of historical messages to load. If not specified, will load last 100 messages." });
 
             try
             {
@@ -221,7 +225,7 @@ namespace Scoredle
                 // Using the ready event is a simple implementation for the sake of the example. Suitable for testing and development.
                 // For a production bot, it is recommended to only run the CreateGlobalApplicationCommandAsync() once for each command.
             }
-            catch (ApplicationCommandException exception)
+            catch (HttpException exception)
             {
                 // If our command was invalid, we should catch an ApplicationCommandException. This exception contains the path of the error as well as the error message. You can serialize the Error field in the exception to get a visual of where your error is.
                 var json = JsonConvert.SerializeObject(exception.Errors, Formatting.Indented);
@@ -233,6 +237,16 @@ namespace Scoredle
 
         private async Task SlashCommandHandler(SocketSlashCommand command)
         {
+            var gameService = getGameService();
+
+            var messageLimitOption = command.Data.Options.FirstOrDefault(x => x.Name == "message-count")?.Value;
+            var messageLimit = messageLimitOption as int?;
+
+            var messages = command.Channel.GetMessagesAsync(messageLimit ?? 100);
+
+            await gameService.LoadHistoricalMessages(messages);
+
+
             await command.RespondAsync($"You executed {command.Data.Name}");
         }
     }
