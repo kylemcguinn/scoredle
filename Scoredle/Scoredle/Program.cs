@@ -240,14 +240,13 @@ namespace Scoredle
             var gameService = getGameService();
 
             var messageLimitOption = command.Data.Options.FirstOrDefault(x => x.Name == "message-count")?.Value;
-            var messageLimit = messageLimitOption as int?;
+            var messageLimit = messageLimitOption == null ? 100 : (int)(long) messageLimitOption;
 
-            var messages = command.Channel.GetMessagesAsync(messageLimit ?? 100);
+            var messages = command.Channel.GetMessagesAsync(messageLimit);
 
-            await gameService.LoadHistoricalMessages(messages);
+            var scoreCount = await gameService.LoadHistoricalMessages(messages);
 
-
-            await command.RespondAsync($"You executed {command.Data.Name}");
+            await command.RespondAsync($"{command.Data.Name} executed successfully and recorded {scoreCount} scores!");
         }
     }
 }
