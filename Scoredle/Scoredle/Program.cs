@@ -1,20 +1,14 @@
-﻿using System;
-using System.Reflection;
-using System.Threading;
-using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
-using Discord;
+﻿using Discord;
 using Discord.Commands;
-using Discord.WebSocket;
-using Discord.Net;
-using Newtonsoft.Json;
-using Microsoft.Extensions.Configuration;
-using Scoredle.Data;
-using Microsoft.EntityFrameworkCore;
-using Scoredle.Services.GameService;
-using Scoredle.Services.Commands;
-using Scoredle.Services.Commands.SlashCommands;
 using Discord.Interactions;
+using Discord.WebSocket;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Scoredle.Data;
+using Scoredle.Services.GameService;
+using System;
+using System.Reflection;
 
 namespace Scoredle
 {
@@ -96,27 +90,10 @@ namespace Scoredle
             map.AddDbContext<ScordleContext>(
                 o => o.UseSqlServer(_config.GetConnectionString("ScordleDb")));
 
-            ConfigureCommands(map);
-
             // When all your required services are in the collection, build the container.
             // Tip: There's an overload taking in a 'validateScopes' bool to make sure
             // you haven't made any mistakes in your dependency graph.
             return map.BuildServiceProvider();
-        }
-
-        private void ConfigureCommands(IServiceCollection services)
-        {
-            Assembly.GetExecutingAssembly()
-            .GetTypes()
-            .Where(item => item.GetInterfaces()
-            .Where(i => i.IsGenericType).Any(i => i.GetGenericTypeDefinition() == typeof(ICommand<>)) && !item.IsAbstract && !item.IsInterface)
-            .ToList()
-            .ForEach(assignedTypes =>
-            {
-                var serviceType = assignedTypes.GetInterfaces().First(i => i.GetGenericTypeDefinition() == typeof(ICommand<>));
-                //services.AddScoped(serviceType, assignedTypes);
-                services.AddScoped(assignedTypes, assignedTypes);
-            });
         }
 
         // Example of a logging handler. This can be re-used by addons
@@ -180,7 +157,12 @@ namespace Scoredle
 
             // Subscribe a handler to see if a message invokes a command.
             _client.MessageReceived += HandleCommandAsync;
-            _client.SlashCommandExecuted += SlashCommandHandler;
+            //_client.SlashCommandExecuted += SlashCommandHandler;
+            _client.InteractionCreated += async (x) =>
+            {
+                var ctx = new SocketInteractionContext(_client, x);
+                await _interactionService.ExecuteCommandAsync(ctx, _services);
+            };
         }
 
         private async Task HandleCommandAsync(SocketMessage arg)
@@ -235,44 +217,17 @@ namespace Scoredle
         }
         private async Task Client_Ready()
         {
-            var globalCommand = new SlashCommandBuilder();
-            globalCommand.WithName("load-history");
-            globalCommand.WithDescription("Load historical score messages");
-            globalCommand.AddOption(new SlashCommandOptionBuilder { Type = ApplicationCommandOptionType.Integer, Name = "message-count", Description = "Amount of historical messages to load. If not specified, will load last 100 messages." });
+            var debugGuildConfig = _config["DebugGuildId"];
+            var debugGuildId = ulong.Parse(debugGuildConfig);
 
-            try
-            {
-                await _client.CreateGlobalApplicationCommandAsync(globalCommand.Build());
-                // Using the ready event is a simple implementation for the sake of the example. Suitable for testing and development.
-                // For a production bot, it is recommended to only run the CreateGlobalApplicationCommandAsync() once for each command.
-            }
-            catch (HttpException exception)
-            {
-                // If our command was invalid, we should catch an ApplicationCommandException. This exception contains the path of the error as well as the error message. You can serialize the Error field in the exception to get a visual of where your error is.
-                var json = JsonConvert.SerializeObject(exception.Errors, Formatting.Indented);
 
-                // You can send this error somewhere or just print it to the console, for this example we're just going to print it.
-                Console.WriteLine(json);
-            }
-        }
+            await _interactionService.AddModulesAsync(Assembly.GetEntryAssembly(), _services);
 
-        private async Task SlashCommandHandler(SocketSlashCommand command)
-        {
-            //var gameService = GetService<IGameService>();
-
-            //var messageLimitOption = command.Data.Options.FirstOrDefault(x => x.Name == "message-count")?.Value;
-            //var messageLimit = messageLimitOption == null ? 100 : (int)(long) messageLimitOption;
-
-            //var messages = command.Channel.GetMessagesAsync(messageLimit);
-
-            //var scoreCount = await gameService.LoadHistoricalMessages(messages);
-
-            //await command.RespondAsync($"{command.Data.Name} executed successfully and recorded {scoreCount} scores!");
-
-            //var slashCommand = GetService<ListGamesCommand>();
-            //slashCommand.Parameter = command;
-            //await slashCommand.Execute();
-            var test = command;
+#if DEBUG
+            await _interactionService.RegisterCommandsToGuildAsync(debugGuildId);
+#else
+            await _interactionService.RegisterCommandsGloballyAsync();
+# endif
         }
     }
 }
