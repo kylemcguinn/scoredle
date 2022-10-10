@@ -12,6 +12,9 @@ using Microsoft.Extensions.Configuration;
 using Scoredle.Data;
 using Microsoft.EntityFrameworkCore;
 using Scoredle.Services.GameService;
+using Scoredle.Services.Commands;
+using Scoredle.Services.Commands.SlashCommands;
+using Discord.Interactions;
 
 namespace Scoredle
 {
@@ -30,6 +33,7 @@ namespace Scoredle
         // Keep the CommandService and DI container around for use with commands.
         // These two types require you install the Discord.Net.Commands package.
         private readonly CommandService _commands;
+        private readonly InteractionService _interactionService;
         private readonly IServiceProvider _services;
         private readonly IConfiguration _config;
 
@@ -70,6 +74,7 @@ namespace Scoredle
 
             _client.Log += Log;
             _client.Ready += Client_Ready;
+            _interactionService = new InteractionService(_client.Rest);
 
             _commands.Log += Log;
 
@@ -91,10 +96,27 @@ namespace Scoredle
             map.AddDbContext<ScordleContext>(
                 o => o.UseSqlServer(_config.GetConnectionString("ScordleDb")));
 
+            ConfigureCommands(map);
+
             // When all your required services are in the collection, build the container.
             // Tip: There's an overload taking in a 'validateScopes' bool to make sure
             // you haven't made any mistakes in your dependency graph.
             return map.BuildServiceProvider();
+        }
+
+        private void ConfigureCommands(IServiceCollection services)
+        {
+            Assembly.GetExecutingAssembly()
+            .GetTypes()
+            .Where(item => item.GetInterfaces()
+            .Where(i => i.IsGenericType).Any(i => i.GetGenericTypeDefinition() == typeof(ICommand<>)) && !item.IsAbstract && !item.IsInterface)
+            .ToList()
+            .ForEach(assignedTypes =>
+            {
+                var serviceType = assignedTypes.GetInterfaces().First(i => i.GetGenericTypeDefinition() == typeof(ICommand<>));
+                //services.AddScoped(serviceType, assignedTypes);
+                services.AddScoped(assignedTypes, assignedTypes);
+            });
         }
 
         // Example of a logging handler. This can be re-used by addons
@@ -193,7 +215,7 @@ namespace Scoredle
                 //    await msg.Channel.SendMessageAsync(result.ErrorReason);
             }
 
-            var gameService = getGameService();
+            var gameService = GetService<IGameService>();
 
             var game = await gameService.GetGameFromMessage(msg.Content);
 
@@ -203,14 +225,13 @@ namespace Scoredle
             }
 
         }
-
-        private IGameService getGameService()
+        private T GetService<T>()
         {
-            var gameService = _services.GetService<IGameService>();
-            if (gameService == null)
-                throw new Exception("Unable to resolve IGameService");
+            var service = _services.GetService<T>();
+            if (service == null)
+                throw new Exception($"Unable to resolve {typeof(T).Name}");
 
-            return gameService;
+            return service;
         }
         private async Task Client_Ready()
         {
@@ -237,16 +258,21 @@ namespace Scoredle
 
         private async Task SlashCommandHandler(SocketSlashCommand command)
         {
-            var gameService = getGameService();
+            //var gameService = GetService<IGameService>();
 
-            var messageLimitOption = command.Data.Options.FirstOrDefault(x => x.Name == "message-count")?.Value;
-            var messageLimit = messageLimitOption == null ? 100 : (int)(long) messageLimitOption;
+            //var messageLimitOption = command.Data.Options.FirstOrDefault(x => x.Name == "message-count")?.Value;
+            //var messageLimit = messageLimitOption == null ? 100 : (int)(long) messageLimitOption;
 
-            var messages = command.Channel.GetMessagesAsync(messageLimit);
+            //var messages = command.Channel.GetMessagesAsync(messageLimit);
 
-            var scoreCount = await gameService.LoadHistoricalMessages(messages);
+            //var scoreCount = await gameService.LoadHistoricalMessages(messages);
 
-            await command.RespondAsync($"{command.Data.Name} executed successfully and recorded {scoreCount} scores!");
+            //await command.RespondAsync($"{command.Data.Name} executed successfully and recorded {scoreCount} scores!");
+
+            //var slashCommand = GetService<ListGamesCommand>();
+            //slashCommand.Parameter = command;
+            //await slashCommand.Execute();
+            var test = command;
         }
     }
 }
