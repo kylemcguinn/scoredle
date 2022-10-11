@@ -19,6 +19,7 @@ namespace Scoredle.Data.Entities
         public string SubmissionText { get; set; } = string.Empty;
         public string? Note { get; set; }
         public string? GameIdentifier { get; set; }
+        public int? SequentialGameIdentifier { get; set; }
         public ulong ChannelId { get; set; }
         public ulong? GuildId { get; set; }
     }

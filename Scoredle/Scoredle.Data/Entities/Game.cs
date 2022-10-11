@@ -30,5 +30,9 @@ namespace Scoredle.Data.Entities
         /// (optional) Url used to play the game
         /// </summary>
         public string? Url { get; set; }
+        /// <summary>
+        /// (optional) If a game uses sequential game identifiers, this will specify the epoch date for the game and will be used to determine on which day a game was scored
+        /// </summary>
+        public DateTime? Epoch { get; set; }
     }
 }

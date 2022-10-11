@@ -33,6 +33,20 @@ namespace Scoredle.Services.GameService
             return game;
         }
 
+        public async Task<List<Score>> GetScoresBySequentialIdentifier(int gameId, int minGameId, int maxGameId)
+        {
+            var scores = await _scordleContext.Scores.Where(x => x.GameId == gameId && minGameId <= x.SequentialGameIdentifier && x.SequentialGameIdentifier <= maxGameId).ToListAsync();
+
+            return scores;
+        }
+
+        public async Task<Game?> GetGameById(int id)
+        {
+            var games = await _scordleContext.Games.Where(x => x.Id == id).ToListAsync();
+
+            return games.FirstOrDefault();
+        }
+
         private Game? getGame(string message, List<Game> games)
         {
             Game? matchedGame = null;
@@ -83,6 +97,9 @@ namespace Scoredle.Services.GameService
             var hardMode = match.Groups["hard"];
             var gameId = match.Groups["gameId"];
 
+            int sequentialId;
+            var isSeqential = int.TryParse(gameId.Value, out sequentialId);
+
             int attemptsValue = int.Parse(attempts.Value);
             int maxAttemptsValue = int.Parse(maxAttempts.Value);
 
@@ -100,7 +117,8 @@ namespace Scoredle.Services.GameService
                 Note = string.IsNullOrEmpty(hardMode.Value) ? null : "hard",
                 GameIdentifier = string.IsNullOrEmpty(gameId.Value) ? null : gameId.Value,
                 ChannelId = channelId,
-                GuildId = guildId
+                GuildId = guildId,
+                SequentialGameIdentifier = isSeqential ? sequentialId : null
             };
 
             return score;

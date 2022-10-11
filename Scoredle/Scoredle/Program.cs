@@ -163,6 +163,11 @@ namespace Scoredle
                 var ctx = new SocketInteractionContext(_client, x);
                 await _interactionService.ExecuteCommandAsync(ctx, _services);
             };
+            //_client.SelectMenuExecuted += async (x) =>
+            //{
+            //    var ctx = new SocketInteractionContext(_client, x);
+            //    await _interactionService.ExecuteCommandAsync(ctx, _services);
+            //};
         }
 
         private async Task HandleCommandAsync(SocketMessage arg)
