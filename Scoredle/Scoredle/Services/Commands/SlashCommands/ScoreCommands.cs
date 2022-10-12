@@ -52,55 +52,84 @@ namespace Scoredle.Services.Commands.SlashCommands
         [ComponentInteraction("game-menu-score", true)]
         public async Task ScoreGame(string gameIdString)
         {
-            int gameId;
-            var success = int.TryParse(gameIdString, out gameId);
-
-            if (!success)
+            try
             {
-                // log something here
-                return;
-            }
+                int gameId;
+                var success = int.TryParse(gameIdString, out gameId);
 
-            var game = await _gameService.GetGameById(gameId);
-            if (game == null)
+                if (!success)
+                {
+                    // log something here
+                    return;
+                }
+
+                var game = await _gameService.GetGameById(gameId);
+                if (game == null)
+                {
+                    await ReplyAsync("Unable to resolve game");
+                    return;
+                }
+                else if (!game.Epoch.HasValue)
+                {
+                    await ReplyAsync("Non sequential game identifiers not currently supported");
+                    return;
+                }
+
+                var currentGameNumber = DateTime.Now.Subtract(game.Epoch.Value).Days;
+                var dayOfTheWeek = (int)DateTime.Now.DayOfWeek;
+
+                var scores = await _gameService.GetScoresBySequentialIdentifier(game.Id, currentGameNumber - dayOfTheWeek, currentGameNumber);
+
+                var maxNameLength = scores.Max(x => x.UserDisplayName.Length);
+                var format = $"{{0, -{(maxNameLength + 3)}}}{{1, -{dayOfTheWeek * 5}}}{{2, -4}}";
+                var scoreResults = string.Format(format, "Name", "Guesses", "Total");
+
+                var scoreGroups = scores.GroupBy(x => x.UserId, (userId, scores) =>
+                {
+                    var uniqueScores = scores.OrderBy(score => score.SequentialGameIdentifier)
+                                .GroupBy(score => score.SequentialGameIdentifier, (id, mScores) => new
+                                {
+                                    Attempts = mScores.OrderByDescending(x => x.SubmissionDateTime).First().Attempts,
+                                    Id = id
+                                })
+                                .Select(score => new { Attempts = score.Attempts.ToString(), Id = score.Id });
+
+                    int[] array = new int[dayOfTheWeek + 1];
+                    var allScores = new List<string>();
+
+                    for (var i = 0; i < dayOfTheWeek + 1; i++)
+                    {
+                        var score = uniqueScores.SingleOrDefault(x => x.Id == (currentGameNumber - dayOfTheWeek) + i);
+                        allScores.Add(score?.Attempts ?? "-");
+                    }
+
+                    return new
+                    {
+                        Name = scores.First().UserDisplayName,
+                        Scores = string.Join(' ', allScores),
+                        Total = scores.Sum(score => score.ScoreValue)
+                    };
+                })
+                .OrderByDescending(x => x.Total);
+
+
+                foreach (var score in scoreGroups)
+                {
+                    var scoreString = string.Format(format, score.Name, $"[{score.Scores}]", score.Total);
+                    scoreResults += Environment.NewLine + scoreString;
+                }
+
+                await ((SocketMessageComponent)Context.Interaction).UpdateAsync(properties =>
+                {
+                    properties.Content = $"```{scoreResults}```";
+                    properties.Components = null;
+                });
+                //await RespondAsync($"```{scoreResults}```");
+            }
+            catch (Exception ex)
             {
-                await ReplyAsync("Unable to resolve game");
-                return;
+                // TODO: Error handling
             }
-            else if (!game.Epoch.HasValue)
-            {
-                await ReplyAsync("Non sequential game identifiers not currently supported");
-                return;
-            }
-
-            var currentGameNumber = DateTime.Now.Subtract(game.Epoch.Value).Days;
-            var dayOfTheWeek = (int)DateTime.Now.DayOfWeek;
-
-            var scores = await _gameService.GetScoresBySequentialIdentifier(game.Id, currentGameNumber - dayOfTheWeek, currentGameNumber);
-
-            var maxNameLength = scores.Max(x => x.UserDisplayName.Length);
-            var format = $"{{0, -{(maxNameLength + 5)}}}{{1, -{dayOfTheWeek * 5}}}{{2, -4}}";
-            var scoreResults = string.Format(format, "Name", "Guesses", "Total");
-
-            var scoreGroups = scores.GroupBy(x => x.UserId, (userId, scores) => new
-            {
-                Name = scores.First().UserDisplayName,
-                Scores = string.Join(' ', scores.Select(score => score.Attempts)),
-                Total = scores.Sum(score => score.ScoreValue)
-            });
-
-
-            foreach (var score in scoreGroups) {
-                var scoreString = string.Format(format, score.Name, $"[{score.Scores}]", score.Total);
-                scoreResults += Environment.NewLine + scoreString;
-            }
-
-            //await ((SocketMessageComponent)Context.Interaction).UpdateAsync(properties =>
-            //{
-            //    properties.Content = $"```{scoreResults}```";
-            //    properties.Components = null;
-            //});
-            await RespondAsync($"```{scoreResults}```");
         }
     }
 }

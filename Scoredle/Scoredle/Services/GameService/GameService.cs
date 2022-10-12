@@ -35,7 +35,9 @@ namespace Scoredle.Services.GameService
 
         public async Task<List<Score>> GetScoresBySequentialIdentifier(int gameId, int minGameId, int maxGameId)
         {
-            var scores = await _scordleContext.Scores.Where(x => x.GameId == gameId && minGameId <= x.SequentialGameIdentifier && x.SequentialGameIdentifier <= maxGameId).ToListAsync();
+            var scores = await _scordleContext.Scores
+                .Where(x => x.GameId == gameId && minGameId <= x.SequentialGameIdentifier && x.SequentialGameIdentifier <= maxGameId)
+                .ToListAsync();
 
             return scores;
         }

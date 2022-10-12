@@ -209,6 +209,8 @@ namespace Scoredle
             if (game != null)
             {
                 await gameService.SubmitScore(game, msg);
+                var emoji = new Emoji("✅");
+                await msg.AddReactionAsync(emoji);
             }
 
         }
