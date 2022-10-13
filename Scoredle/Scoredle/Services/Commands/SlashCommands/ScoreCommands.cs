@@ -3,6 +3,8 @@ using Discord.Interactions;
 using Discord.WebSocket;
 using Scoredle.Data.Entities;
 using Scoredle.Services.GameService;
+using Serilog;
+using static System.Formats.Asn1.AsnWriter;
 
 namespace Scoredle.Services.Commands.SlashCommands
 {
@@ -59,7 +61,7 @@ namespace Scoredle.Services.Commands.SlashCommands
 
                 if (!success)
                 {
-                    // log something here
+                    Log.Warning("Could not parse Game ID from selected menu item");
                     return;
                 }
 
@@ -78,36 +80,52 @@ namespace Scoredle.Services.Commands.SlashCommands
                 var currentGameNumber = DateTime.Now.Subtract(game.Epoch.Value).Days;
                 var dayOfTheWeek = (int)DateTime.Now.DayOfWeek;
 
-                var scores = await _gameService.GetScoresBySequentialIdentifier(game.Id, currentGameNumber - dayOfTheWeek, currentGameNumber);
+                var scores = await _gameService.GetScoresBySequentialIdentifier(Context.Guild.Id, game.Id, currentGameNumber - dayOfTheWeek, currentGameNumber);
 
                 var maxNameLength = scores.Max(x => x.UserDisplayName.Length);
-                var format = $"{{0, -{(maxNameLength + 3)}}}{{1, -{dayOfTheWeek * 5}}}{{2, -4}}";
-                var scoreResults = string.Format(format, "Name", "Guesses", "Total");
+                var format = $"{{0, -{(maxNameLength + 3)}}}{{1, -{dayOfTheWeek * 4}}}{{2, -3}}";
+                var scoreResults = string.Format(format, "Name", "Guesses", "Score");
 
                 var scoreGroups = scores.GroupBy(x => x.UserId, (userId, scores) =>
                 {
                     var uniqueScores = scores.OrderBy(score => score.SequentialGameIdentifier)
-                                .GroupBy(score => score.SequentialGameIdentifier, (id, mScores) => new
-                                {
-                                    Attempts = mScores.OrderByDescending(x => x.SubmissionDateTime).First().Attempts,
-                                    Id = id
+                                .GroupBy(score => score.SequentialGameIdentifier, (id, mScores) => {
+                                    var mostRecentScore = mScores.OrderByDescending(x => x.SubmissionDateTime).First();
+
+                                    return new
+                                    {
+                                        Attempts = mostRecentScore.Attempts,
+                                        ScoreValue = mostRecentScore.ScoreValue,
+                                        Id = id
+                                    };
                                 })
-                                .Select(score => new { Attempts = score.Attempts.ToString(), Id = score.Id });
+                                .Select(score => new { Attempts = score.Attempts, Id = score.Id, ScoreValue = score.ScoreValue });
 
                     int[] array = new int[dayOfTheWeek + 1];
                     var allScores = new List<string>();
 
                     for (var i = 0; i < dayOfTheWeek + 1; i++)
                     {
+                        string attempts;
                         var score = uniqueScores.SingleOrDefault(x => x.Id == (currentGameNumber - dayOfTheWeek) + i);
-                        allScores.Add(score?.Attempts ?? "-");
+
+                        if (score == null)
+                        {
+                            attempts = "-";
+                        } else
+                        {
+                            var parsedAttempts = score.Attempts.ToString() ?? "";
+                            attempts = string.IsNullOrEmpty(parsedAttempts) ? "X" : parsedAttempts;
+                        }
+
+                        allScores.Add(attempts);
                     }
 
                     return new
                     {
                         Name = scores.First().UserDisplayName,
                         Scores = string.Join(' ', allScores),
-                        Total = scores.Sum(score => score.ScoreValue)
+                        Total = uniqueScores.Sum(score => score.ScoreValue)
                     };
                 })
                 .OrderByDescending(x => x.Total);
@@ -124,11 +142,10 @@ namespace Scoredle.Services.Commands.SlashCommands
                     properties.Content = $"```{scoreResults}```";
                     properties.Components = null;
                 });
-                //await RespondAsync($"```{scoreResults}```");
             }
             catch (Exception ex)
             {
-                // TODO: Error handling
+                Log.Error(ex.ToString());
             }
         }
     }

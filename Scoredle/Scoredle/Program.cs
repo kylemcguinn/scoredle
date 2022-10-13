@@ -7,6 +7,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Scoredle.Data;
 using Scoredle.Services.GameService;
+using Serilog;
+using Serilog.Events;
 using System;
 using System.Reflection;
 
@@ -33,6 +35,13 @@ namespace Scoredle
 
         private Program()
         {
+            Log.Logger = new LoggerConfiguration()
+            .MinimumLevel.Verbose()
+            .Enrich.FromLogContext()
+            .WriteTo.Console()
+            .CreateLogger();
+
+
             _client = new DiscordSocketClient(new DiscordSocketConfig
             {
                 // How much logging do you want to see?
@@ -66,11 +75,11 @@ namespace Scoredle
                 .AddUserSecrets<Program>()
                 .Build();
 
-            _client.Log += Log;
+            _client.Log += LogAsync;
             _client.Ready += Client_Ready;
             _interactionService = new InteractionService(_client.Rest);
 
-            _commands.Log += Log;
+            _commands.Log += LogAsync;
 
             // Setup your DI container.
             _services = ConfigureServices();
@@ -98,7 +107,7 @@ namespace Scoredle
 
         // Example of a logging handler. This can be re-used by addons
         // that ask for a Func<LogMessage, Task>.
-        private static Task Log(LogMessage message)
+        private static Task ConsoleLog(LogMessage message)
         {
             switch (message.Severity)
             {
@@ -128,7 +137,21 @@ namespace Scoredle
             // the alternative is to 'return Task.Delay(0);' instead.
             return Task.CompletedTask;
         }
-
+        private static async Task LogAsync(LogMessage message)
+        {
+            var severity = message.Severity switch
+            {
+                LogSeverity.Critical => LogEventLevel.Fatal,
+                LogSeverity.Error => LogEventLevel.Error,
+                LogSeverity.Warning => LogEventLevel.Warning,
+                LogSeverity.Info => LogEventLevel.Information,
+                LogSeverity.Verbose => LogEventLevel.Verbose,
+                LogSeverity.Debug => LogEventLevel.Debug,
+                _ => LogEventLevel.Information
+            };
+            Log.Write(severity, message.Exception, "[{Source}] {Message}", message.Source, message.Message);
+            await Task.CompletedTask;
+        }
         private async Task MainAsync()
         {
             var token = _config["DiscordBotToken"];

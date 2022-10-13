@@ -1,10 +1,8 @@
 ﻿using Discord;
-using Discord.Net;
 using Discord.WebSocket;
 using Microsoft.EntityFrameworkCore;
 using Scoredle.Data;
 using Scoredle.Data.Entities;
-using System.Security.Cryptography.X509Certificates;
 using System.Text.RegularExpressions;
 using Game = Scoredle.Data.Entities.Game;
 
@@ -33,10 +31,10 @@ namespace Scoredle.Services.GameService
             return game;
         }
 
-        public async Task<List<Score>> GetScoresBySequentialIdentifier(int gameId, int minGameId, int maxGameId)
+        public async Task<List<Score>> GetScoresBySequentialIdentifier(ulong guildId, int gameId, int minGameId, int maxGameId)
         {
             var scores = await _scordleContext.Scores
-                .Where(x => x.GameId == gameId && minGameId <= x.SequentialGameIdentifier && x.SequentialGameIdentifier <= maxGameId)
+                .Where(x => x.GuildId == guildId && x.GameId == gameId && minGameId <= x.SequentialGameIdentifier && x.SequentialGameIdentifier <= maxGameId)
                 .ToListAsync();
 
             return scores;
@@ -102,7 +100,9 @@ namespace Scoredle.Services.GameService
             int sequentialId;
             var isSeqential = int.TryParse(gameId.Value, out sequentialId);
 
-            int attemptsValue = int.Parse(attempts.Value);
+            int attemptsValue;
+            int.TryParse(attempts.Value, out attemptsValue);
+
             int maxAttemptsValue = int.Parse(maxAttempts.Value);
 
             var score = new Score
@@ -115,7 +115,7 @@ namespace Scoredle.Services.GameService
                 SubmissionDateTime = submissionDateTime,
                 ReceivedDateTime = DateTime.UtcNow,
                 ScoreValue = calculateScore(attemptsValue, maxAttemptsValue),
-                Attempts = attemptsValue,
+                Attempts = attemptsValue > 0 ? attemptsValue : null,
                 Note = string.IsNullOrEmpty(hardMode.Value) ? null : "hard",
                 GameIdentifier = string.IsNullOrEmpty(gameId.Value) ? null : gameId.Value,
                 ChannelId = channelId,
@@ -164,6 +164,9 @@ namespace Scoredle.Services.GameService
 
         private int calculateScore(int attempts, int maxAttempts)
         {
+            if (attempts <= 0)
+                return 0;
+
             var placement = maxAttempts + 1 - attempts;
             return placement * placement;
         }
