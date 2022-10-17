@@ -2,6 +2,8 @@
 using Discord.Commands;
 using Discord.Interactions;
 using Discord.WebSocket;
+using Microsoft.Azure.Services.AppAuthentication;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -16,6 +18,8 @@ namespace Scoredle
 {
     internal class Program
     {
+        readonly string AzureDatabaseUri = "https://database.windows.net/";
+
         // Program entry point
         static Task Main(string[] args)
         {
@@ -96,8 +100,16 @@ namespace Scoredle
             // and other dependencies that your commands might need.
             .AddSingleton<IGameService, GameService>();
 
-            map.AddDbContext<ScordleContext>(
-                o => o.UseSqlServer(_config.GetConnectionString("ScordleDb")));
+            map.AddDbContext<ScordleContext>(o =>
+                {
+                    var connectionString = _config.GetConnectionString("ScordleDb");
+                    var connection = new SqlConnection(connectionString);
+#if !DEBUG
+
+                    connection.AccessToken = new AzureServiceTokenProvider().GetAccessTokenAsync(AzureDatabaseUri).Result;
+#endif
+                    o.UseSqlServer(connection);
+                });
 
             // When all your required services are in the collection, build the container.
             // Tip: There's an overload taking in a 'validateScopes' bool to make sure
@@ -247,17 +259,19 @@ namespace Scoredle
         }
         private async Task Client_Ready()
         {
-            var debugGuildConfig = _config["DebugGuildId"];
-            var debugGuildId = ulong.Parse(debugGuildConfig);
-
-
             await _interactionService.AddModulesAsync(Assembly.GetEntryAssembly(), _services);
 
 #if DEBUG
-            await _interactionService.RegisterCommandsToGuildAsync(debugGuildId);
+            var debugGuildConfig = _config["DebugGuildIds"];
+            var guildIds = debugGuildConfig.Split(',').Select(ulong.Parse).ToArray();
+
+            foreach (var guildId in guildIds)
+            {
+                await _interactionService.RegisterCommandsToGuildAsync(guildId);
+            }
 #else
             await _interactionService.RegisterCommandsGloballyAsync();
-# endif
+#endif
         }
     }
 }

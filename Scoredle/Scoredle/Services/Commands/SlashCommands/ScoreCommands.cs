@@ -80,7 +80,13 @@ namespace Scoredle.Services.Commands.SlashCommands
                 var currentGameNumber = DateTime.Now.Subtract(game.Epoch.Value).Days;
                 var dayOfTheWeek = (int)DateTime.Now.DayOfWeek;
 
-                var scores = await _gameService.GetScoresBySequentialIdentifier(Context.Guild.Id, game.Id, currentGameNumber - dayOfTheWeek, currentGameNumber);
+                var scores = await _gameService.GetScoresBySequentialIdentifier(Context.Guild.Id, Context.Channel.Id, game.Id, currentGameNumber - dayOfTheWeek, currentGameNumber);
+
+                if (scores.Count < 1)
+                {
+                    await ReplyAsync("No scores available for current week.");
+                    return;
+                }
 
                 var maxNameLength = scores.Max(x => x.UserDisplayName.Length);
                 var format = $"{{0, -{(maxNameLength + 3)}}}{{1, -{dayOfTheWeek * 4}}}{{2, -3}}";
@@ -139,7 +145,7 @@ namespace Scoredle.Services.Commands.SlashCommands
 
                 await ((SocketMessageComponent)Context.Interaction).UpdateAsync(properties =>
                 {
-                    properties.Content = $"```{scoreResults}```";
+                    properties.Content = $"{game.Name}{Environment.NewLine}```{scoreResults}```";
                     properties.Components = null;
                 });
             }

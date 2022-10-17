@@ -31,10 +31,10 @@ namespace Scoredle.Services.GameService
             return game;
         }
 
-        public async Task<List<Score>> GetScoresBySequentialIdentifier(ulong guildId, int gameId, int minGameId, int maxGameId)
+        public async Task<List<Score>> GetScoresBySequentialIdentifier(ulong guildId, ulong channelId, int gameId, int minGameId, int maxGameId)
         {
             var scores = await _scordleContext.Scores
-                .Where(x => x.GuildId == guildId && x.GameId == gameId && minGameId <= x.SequentialGameIdentifier && x.SequentialGameIdentifier <= maxGameId)
+                .Where(x => x.GuildId == guildId && x.ChannelId == channelId && x.GameId == gameId && minGameId <= x.SequentialGameIdentifier && x.SequentialGameIdentifier <= maxGameId)
                 .ToListAsync();
 
             return scores;

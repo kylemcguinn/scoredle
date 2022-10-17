@@ -11,6 +11,6 @@ namespace Scoredle.Services.GameService
         public Task<Game?> GetGameFromMessage(string message);
         public Task<Game?> GetGameById(int id);
         public Task<int> LoadHistoricalMessages(IAsyncEnumerable<IReadOnlyCollection<IMessage>> pagedMessages);
-        public Task<List<Score>> GetScoresBySequentialIdentifier(ulong guildId, int gameId, int minGameId, int maxGameId);
+        public Task<List<Score>> GetScoresBySequentialIdentifier(ulong guildId, ulong channelId, int gameId, int minGameId, int maxGameId);
     }
 }
